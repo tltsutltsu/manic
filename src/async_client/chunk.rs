@@ -96,10 +96,13 @@ impl Chunk {
         client: &Client,
         url: String,
         #[cfg(feature = "progress")] pb: Option<ProgressBar>,
+        headers: Option<reqwest::header::HeaderMap>,
     ) -> Result<Self> {
+        let mut headers = headers.unwrap_or_default();
+        headers.insert(RANGE, self.bytes.parse().unwrap());
         let resp = client
             .get(url.to_string())
-            .header(RANGE, self.bytes.clone())
+            .headers(headers)
             .send()
             .await?;
         let b = resp.bytes().await?;
@@ -134,6 +137,7 @@ impl Chunks {
         client: &Client,
         url: String,
         #[cfg(feature = "progress")] pb: Option<ProgressBar>,
+        headers: Option<reqwest::header::HeaderMap>,
     ) -> Result<ChunkVec> {
         let fut_vec = self
             .map(|x| {
@@ -142,6 +146,7 @@ impl Chunks {
                     url.clone(),
                     #[cfg(feature = "progress")]
                     pb.clone(),
+                    headers.clone(),
                 )
             })
             .collect::<Vec<_>>();

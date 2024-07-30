@@ -88,9 +88,9 @@ impl MultiDownloader {
             progress_style: None,
         }
     }
-    pub async fn add(&mut self, url: String, workers: u8) -> Result<()> {
+    pub async fn add(&mut self, url: String, workers: u8, headers: Option<reqwest::header::HeaderMap>) -> Result<()> {
         #[allow(unused_mut)]
-        let mut client = Downloader::new(&url, workers).await?;
+        let mut client = Downloader::new(&url, workers, headers).await?;
         #[cfg(feature = "progress")]
         if let Some(pb) = &self.progress {
             let mpb = ProgressBar::new(client.get_len());

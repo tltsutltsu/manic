@@ -27,6 +27,7 @@ pub struct Downloader {
     chunks: Chunks,
     #[cfg(feature = "progress")]
     pb: Option<ProgressBar>,
+    headers: Option<reqwest::header::HeaderMap>,
 }
 
 impl Downloader {
@@ -47,6 +48,7 @@ impl Downloader {
         workers: u8,
         length: u64,
         client: Client,
+        headers: Option<reqwest::header::HeaderMap>,
     ) -> Result<Self> {
         let parsed = reqwest::Url::parse(url)?;
         if length == 0 {
@@ -63,6 +65,7 @@ impl Downloader {
             hash: None,
             length,
             chunks,
+            headers,
         });
         #[cfg(feature = "progress")]
         return Ok(Self {
@@ -74,11 +77,12 @@ impl Downloader {
             length,
             chunks,
             pb: None,
+            headers,
         });
     }
-    pub async fn new_manual(url: &str, workers: u8, length: u64) -> Result<Self> {
+    pub async fn new_manual(url: &str, workers: u8, length: u64, headers: Option<reqwest::header::HeaderMap>) -> Result<Self> {
         let client = Client::new();
-        Self::assemble_downloader(url, workers, length, client).await
+        Self::assemble_downloader(url, workers, length, client, headers).await
     }
     /// Create a new downloader
     ///
@@ -93,15 +97,15 @@ impl Downloader {
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), manic::ManicError> {
     ///     // If only one TLS feature is enabled
-    ///     let downloader = Downloader::new("https://crates.io", 5).await?;
+    ///     let downloader = Downloader::new("https://crates.io", 5, None).await?;
     ///
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn new(url: &str, workers: u8) -> Result<Self> {
+    pub async fn new(url: &str, workers: u8, headers: Option<reqwest::header::HeaderMap>) -> Result<Self> {
         let client = Client::new();
         let length = content_length(&client, url).await?;
-        Self::assemble_downloader(url, workers, length, client).await
+        Self::assemble_downloader(url, workers, length, client, headers).await
     }
     pub(crate) fn url_to_filename(url: &reqwest::Url) -> Result<String> {
         url.path_segments()
@@ -148,7 +152,7 @@ impl Downloader {
     /// use manic::ManicError;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), ManicError> {
-    /// let client = Downloader::new("https://crates.io", 5).await?;
+    /// let client = Downloader::new("https://crates.io", 5, None).await?;
     /// let result = client.download().await?;
     /// # Ok(())
     /// # }
@@ -162,12 +166,14 @@ impl Downloader {
         let client = self.client.clone();
         #[cfg(feature = "progress")]
         let pb = self.pb.clone();
+        let headers = self.headers.clone();
         let result = chnks
             .download(
                 &client,
                 url.to_string(),
                 #[cfg(feature = "progress")]
                 pb,
+                headers,
             )
             .await?;
         if let Some(hash) = &self.hash {
@@ -196,7 +202,7 @@ impl Downloader {
     /// #[tokio::main]
     /// async fn main() -> Result<(), ManicError> {
     ///     let hash = Hash::new_sha256("039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81".to_string());
-    ///     let client = Downloader::new("https://crates.io", 5).await?.verify(hash);
+    ///     let client = Downloader::new("https://crates.io", 5, None).await?.verify(hash);
     ///     client.download_and_save("~/Downloads").await?;
     ///     Ok(())
     ///  }
